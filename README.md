@@ -23,7 +23,8 @@ It also allows all normal tokens to be used in the string, those are:
 You can also mix and match those in some ways, checkout https://crontab.guru/ for an amazing explanation on what does your cron do.
 
 ## Installation
-Should be as easy as **cargo install rusty_cron**
+Should be as easy as **cargo add rusty-cron**
+Or do a local installation by defining the path where your code is like **rusty-cron= { path = "../rusty-cron" }**
 
 ## Usage
 Simply add the use rusty_cron::Cron and use Cron::parse_time() with your cron string (I recommend https://crontab.guru/ to validate your strings and create new ones),
