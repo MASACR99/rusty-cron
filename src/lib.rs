@@ -18,7 +18,7 @@ impl Cron {
 
         let mut array_index = 0;
         if separated_values.len() == 6{
-            match Self::parse_crontab_chunk(separated_values[array_index], 0, 59) {
+            match Self::parse_crontab_chunk(separated_values[array_index], 0, 60) {
                 Ok(n) =>  seconds_list = n,
                 Err(e) => return Err(e)
             }
@@ -28,32 +28,32 @@ impl Cron {
             seconds_list = [0].to_vec();
         }
 
-        match Self::parse_crontab_chunk(separated_values[array_index], 0, 59) {
+        match Self::parse_crontab_chunk(separated_values[array_index], 0, 60) {
             Ok(n) =>  minutes_list = n,
             Err(e) => return Err(e)
         }
 
         array_index += 1;
 
-        match Self::parse_crontab_chunk(separated_values[array_index], 0, 23) {
+        match Self::parse_crontab_chunk(separated_values[array_index], 0, 24) {
             Ok(n) =>  hours_list = n,
             Err(e) => return Err(e)
         }
 
         array_index += 1;
-        match Self::parse_crontab_chunk(separated_values[array_index], 1, 31) {
+        match Self::parse_crontab_chunk(separated_values[array_index], 1, 32) {
             Ok(n) =>  days_month_list = n,
             Err(e) => return Err(e)
         }
 
         array_index += 1;
-        match Self::parse_crontab_chunk(separated_values[array_index], 1, 12) {
+        match Self::parse_crontab_chunk(separated_values[array_index], 1, 13) {
             Ok(n) =>  months_list = n,
             Err(e) => return Err(e)
         }
 
         array_index += 1;
-        match Self::parse_crontab_chunk(separated_values[array_index], 0, 6) {
+        match Self::parse_crontab_chunk(separated_values[array_index], 0, 7) {
             Ok(n) =>  days_week_list = n,
             Err(e) => return Err(e)
         }
@@ -69,14 +69,14 @@ impl Cron {
         return Self::get_closest_execution_timer(start_time, months_list, days_month_list, days_week_list, hours_list, minutes_list, seconds_list);
     }
 
-    fn parse_crontab_chunk(chunk: &str, sequence_start: u16, max_value: u16) -> Result<Vec<u32>, String>{
+    fn parse_crontab_chunk(chunk: &str, sequence_start: u32, max_value: u32) -> Result<Vec<u32>, String>{
         match chunk.parse::<u32>() {
             Ok(n) => return Self::process_base_case(n, sequence_start, max_value),
-            Err(_) => Self::process_extra_cases(chunk, sequence_start, max_value),
+            Err(_) => Self::process_list_case(chunk, sequence_start, max_value),
         }
     }
 
-    fn process_base_case(int_val: u32, min_value: u16, max_value: u16) -> Result<Vec<u32>, String> {
+    fn process_base_case(int_val: u32, min_value: u32, max_value: u32) -> Result<Vec<u32>, String> {
         let mut result: Vec<u32> = Vec::new();
 
         if int_val > max_value.into() || int_val < min_value.into() {
@@ -86,40 +86,20 @@ impl Cron {
         result.push(int_val);
         return Ok(result);
     }
-
-    fn process_extra_cases(chunk: &str, sequence_start: u16, max_value: u16) -> Result<Vec<u32>, String> {
-        let char_vec: Vec<char> = chunk.chars().collect();
-        let ch = char_vec[0];
-        if chunk.len() == 1 && ch == '*'{
-            return Self::process_star_case(sequence_start, max_value);
-        }
-        else if chunk.contains("/"){
-            return Self::process_divisor_case(chunk, sequence_start, max_value);
-        }
-        else if chunk.contains("-"){
-            return Self::process_range_case(chunk, max_value);
-        }
-        else if chunk.contains(","){
-            return Self::process_list_case(chunk);
-        }
-        else{
-            return Err(format!("Invalid case detected, please review string format"));
-        }
-    }
     
-    fn process_star_case(sequence_start: u16, max_value: u16) -> Result<Vec<u32>, String> {
+    fn process_star_case(sequence_start: u32, max_value: u32) -> Result<Vec<u32>, String> {
         let mut result: Vec<u32> = Vec::new();
 
-        for i in sequence_start..(max_value+1){
+        for i in sequence_start..max_value{
             result.push(i.into());
         }
 
         return Ok(result);
     }
     
-    fn process_divisor_case(chunk: &str, mut sequence_start: u16, max_value: u16) -> Result<Vec<u32>, String> {
+    fn process_divisor_case(chunk: &str, mut sequence_start: u32, mut max_value: u32) -> Result<Vec<u32>, String> {
         let mut result: Vec<u32> = Vec::new();
-        let divisor: u16;
+        let divisor: u32;
         let chunks: Vec<&str> = chunk.split('/').collect();
 
         if chunks[0].len() == 1 && chunks[0] == "*"
@@ -127,17 +107,30 @@ impl Cron {
         }
         else
         {
-            match chunks[0].parse::<u16>() {
+            match chunks[0].parse::<u32>() {
                 Ok(n) => {sequence_start = n},
-                Err(_) => {return Err(format!("Malformed crontab string"));},
+                Err(_) => 
+                {
+                    if chunks[0].contains('-') {
+                        let range_result = Self::process_range_case(chunks[0], max_value);
+                        match range_result {
+                            Ok(mut n) => {
+                                n.sort();
+                                sequence_start = *n.first().unwrap();
+                                max_value = *n.last().unwrap() + 1;
+                            },
+                            Err(e) => return Err(e)
+                        }
+                    }else {
+                        return Err(format!("Malformed crontab string"))
+                    }
+                },
             }
         }
-        
-        match chunks[1].parse::<u16>() {
+
+        match chunks[1].parse::<u32>() {
             Ok(n) => {
-                if n > max_value{
-                    return Err(format!("Malformed crontab string"));
-                }else if n == 0{
+                if n > max_value || n <= 0{
                     return Err(format!("Malformed crontab string"));
                 }else {
                     divisor = n;
@@ -146,31 +139,29 @@ impl Cron {
             Err(_) => {return Err(format!("Malformed crontab string"));},
         }
 
-        for i in sequence_start..max_value{
-            if i%divisor == 0{
-                result.push(i.into());
-            }
+        for i in (sequence_start..max_value).step_by(divisor.try_into().unwrap()){
+            result.push(i.into());
         }
 
         return Ok(result);
     }
     
-    fn process_range_case( chunk: &str, mut max_value: u16) -> Result<Vec<u32>, String> {
+    fn process_range_case( chunk: &str, mut max_value: u32) -> Result<Vec<u32>, String> {
         let mut result: Vec<u32> = Vec::new();
         let chunks: Vec<&str> = chunk.split('-').collect();
-        let sequence_start: u16;
+        let sequence_start: u32;
 
-        match chunks[0].parse::<u16>() {
+        match chunks[0].parse::<u32>() {
             Ok(n) => {sequence_start = n},
             Err(_) => {return Err(format!("Malformed crontab string"));},
         }
         
-        match chunks[1].parse::<u16>() {
+        match chunks[1].parse::<u32>() {
             Ok(n) => {
-                if n > max_value{
+                if n > max_value || n < sequence_start {
                     return Err(format!("Malformed crontab string"));
                 }else {
-                    max_value = n;
+                    max_value = n + 1;
                 }
             },
             Err(_) => {return Err(format!("Malformed crontab string"));},
@@ -183,16 +174,43 @@ impl Cron {
         return Ok(result);
     }
     
-    fn process_list_case( chunk: &str) -> Result<Vec<u32>, String> {
+    fn process_list_case(chunk: &str, sequence_start: u32, max_value: u32) -> Result<Vec<u32>, String> {
         let mut result: Vec<u32> = Vec::new();
         let chunks: Vec<&str> = chunk.split(',').collect();
 
         for chunkies in chunks {
-            match chunkies.parse::<u16>() {
+            match chunkies.parse::<u32>() {
                 Ok(n) => {
-                    result.push(n.into());
+                    if n <= max_value && n >= sequence_start {
+                            result.push(n.into());
+                    }else {
+                        return Err(format!("Malformed crontab string"));
+                    }
                 },
-                Err(_) => {return Err(format!("Malformed crontab string"));},
+                Err(_) => 
+                {
+                    if chunkies.len() == 1 && chunkies == "*" {
+                        return Self::process_star_case(sequence_start, max_value);
+                    }else{
+                        if chunkies.contains('/') {
+                            let div_results = Self::process_divisor_case(chunkies, sequence_start, max_value);
+
+                            match div_results{
+                                Ok(n) => for div_res in n { result.push(div_res) },
+                                Err(e) => return Err(e)
+                            }
+                        }else if chunkies.contains('-'){
+                            let range_results = Self::process_range_case(chunkies, max_value);
+
+                            match range_results{
+                                Ok(n) => for div_res in n { result.push(div_res) },
+                                Err(e) => return Err(e)
+                            }
+                        }else {
+                            return Err("Malformed crontab string".to_owned())
+                        }
+                    }
+                },
             }
         }
 
