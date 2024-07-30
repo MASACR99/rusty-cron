@@ -1,0 +1,13 @@
+[package]
+name = "rusty-cron"
+version = "0.8.0"
+authors = ["MASACR99"]
+edition = "2021"
+description = "Lightweight and performant library to parse cron format strings and return the remaining miliseconds to execute. Accepts both 5 and 6 parameters (5 for minutes and up and 6 for seconds)"
+readme = "README.md"
+repository = "https://github.com/MASACR99/rusty-cron"
+keywords = ["utility", "utilities"]
+license = "GPL-3.0-only"
+
+[dependencies]
+chrono = "0.4.38"
